@@ -117,20 +117,36 @@ def handle_remove_readonly(func, path, exc_info):
         raise
 
 
+import json
+
+
 def remove_backup(app_name):
     backup_path = Path(BACKUP_DIR) / app_name
 
     if not backup_path.exists():
         print(f"No backups found for '{app_name}'.")
-        return
+    else:
+        try:
+            shutil.rmtree(backup_path, onerror=handle_remove_readonly)
+            print(f"Backups for '{app_name}' have been removed.")
+        except PermissionError:
+            print(f"Permission denied: Unable to remove '{backup_path}'.")
+            return
+        except Exception as e:
+            print(f"Error: Unable to remove backups for '{app_name}'. {e}")
+            return
 
+    # Remove the app from config.json
     try:
-        shutil.rmtree(backup_path, onerror=handle_remove_readonly)
-        print(f"Backups for '{app_name}' have been removed.")
-    except PermissionError:
-        print(f"Permission denied: Unable to remove '{backup_path}'.")
+        config = load_config()
+        if app_name in config:
+            del config[app_name]
+            save_config(config)
+            print(f"Removed '{app_name}' from the configuration.")
+        else:
+            print(f"'{app_name}' was not found in the configuration.")
     except Exception as e:
-        print(f"Error: Unable to remove backups for '{app_name}'. {e}")
+        print(f"Error updating configuration: {e}")
 
 
 def main():

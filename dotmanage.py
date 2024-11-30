@@ -3,6 +3,7 @@ import shutil
 import json
 import argparse
 from pathlib import Path
+import stat
 
 
 CONFIG_FILE = "config.json"
@@ -105,13 +106,31 @@ def add_to_config(app_name, dotfile):
     print(f"Added dotfile '{dotfile}' for app '{app_name}'.")
 
 
+def handle_remove_readonly(func, path, exc_info):
+    """
+    Handler for removing read-only files.
+    """
+    if func in (os.unlink, os.rmdir):
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    else:
+        raise
+
+
 def remove_backup(app_name):
     backup_path = Path(BACKUP_DIR) / app_name
-    if backup_path.exists():
-        shutil.rmtree(backup_path)
-        print(f"Removed backups for app '{app_name}'.")
-    else:
-        print(f"No backups found for app '{app_name}'.")
+
+    if not backup_path.exists():
+        print(f"No backups found for '{app_name}'.")
+        return
+
+    try:
+        shutil.rmtree(backup_path, onerror=handle_remove_readonly)
+        print(f"Backups for '{app_name}' have been removed.")
+    except PermissionError:
+        print(f"Permission denied: Unable to remove '{backup_path}'.")
+    except Exception as e:
+        print(f"Error: Unable to remove backups for '{app_name}'. {e}")
 
 
 def main():
